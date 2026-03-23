@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 import config
-from feature_engine import WindowFeatures
+from processing.feature_engine import WindowFeatures
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +62,14 @@ class Explanation:
 
 class ExplainabilityEngine:
     """Generate explanations from recent window features with actual values."""
+
+    def __init__(
+        self,
+        benign_threshold: float = config.THRESHOLD_BENIGN,
+        suspicious_threshold: float = config.THRESHOLD_SUSPICIOUS,
+    ) -> None:
+        self.benign_threshold = benign_threshold
+        self.suspicious_threshold = suspicious_threshold
 
     def explain(self, risk_score: float, windows: list[WindowFeatures]) -> Explanation:
         if not windows:
@@ -120,9 +128,9 @@ class ExplainabilityEngine:
             benign_signals.append("No renames or deletes")
 
         # Risk level
-        if risk_score >= config.THRESHOLD_SUSPICIOUS:
+        if risk_score >= self.suspicious_threshold:
             level = "high" if risk_score >= 0.7 else "suspicious"
-        elif risk_score <= config.THRESHOLD_BENIGN:
+        elif risk_score <= self.benign_threshold:
             level = "benign"
         else:
             level = "suspicious"

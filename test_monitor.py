@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from monitor import EventMonitor
+from collection import EventMonitor
 
 if __name__ == "__main__":
     with tempfile.TemporaryDirectory() as tmpdir:

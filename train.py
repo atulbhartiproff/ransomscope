@@ -17,7 +17,7 @@ from torch import nn
 from torch.utils.data import DataLoader, Dataset, random_split
 
 import config
-from model import RansomScopeLSTM, build_loss_and_optimizer
+from processing.model import RansomScopeLSTM, build_loss_and_optimizer, ModelManager
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +126,6 @@ def train(args: argparse.Namespace) -> None:
 
         if avg_val < best_val_loss:
             best_val_loss = avg_val
-            from model import ModelManager
             manager = ModelManager(args.model_path, auto_load=False)
             manager.model.load_state_dict(model.state_dict())
             manager.save()

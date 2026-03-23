@@ -1,6 +1,6 @@
 """Sliding time-window feature engine.
 
-Consumes low-level Events from the monitoring layer and produces
+Consumes low-level Events from the collection layer and produces
 fixed-length feature vectors over sliding time windows.
 """
 
@@ -15,7 +15,7 @@ from typing import Deque, List, Optional
 from collections import deque
 
 import config
-from monitor.event_types import Event, EventType
+from collection.event_types import Event, EventType
 
 logger = logging.getLogger(__name__)
 
@@ -84,8 +84,16 @@ def _is_user_dir(path: Optional[str]) -> bool:
         resolved = str(Path(path).resolve())
     except (OSError, RuntimeError):
         return False
-    # Heuristic: /home/* or /root
-    return resolved.startswith("/home/") or resolved.startswith("/root/")
+    normalized = resolved.replace("\\", "/").lower()
+    # Heuristic: Linux/macOS home dirs, WSL-mounted Windows users, native Windows users
+    return (
+        normalized.startswith("/home/")
+        or normalized.startswith("/root/")
+        or normalized.startswith("/users/")
+        or "/users/" in normalized
+        or normalized.startswith("c:/users/")
+        or normalized.startswith("/mnt/c/users/")
+    )
 
 
 class SlidingWindowEngine:
@@ -212,6 +220,13 @@ class SlidingWindowEngine:
             return self._windows[-1]
         return None
 
+    def tick(self, now: Optional[datetime] = None) -> None:
+        """Advance windows based on current time even if no new events arrive."""
+        if self._current_start is None:
+            return
+        ts = now or datetime.now(timezone.utc)
+        self._advance_window_until_contains(ts)
+
     def get_sequence(self) -> list[list[float]]:
         """Return last N windows as a sequence of vectors."""
         return [w.to_vector() for w in self._windows]
@@ -219,4 +234,3 @@ class SlidingWindowEngine:
     def sequence_ready(self) -> bool:
         """True if we have enough windows for a full sequence."""
         return len(self._windows) >= self.sequence_length
-

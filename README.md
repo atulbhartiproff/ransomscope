@@ -20,22 +20,49 @@ ransomescope/
 ├── main.py                # Real-time pipeline + CLI (run / replay)
 ├── train.py               # LSTM training script
 ├── dataset_gen.py         # Synthetic dataset generator
-├── monitor/               # Real-time file + process monitoring
-├── feature_engine/        # Sliding window feature extraction
-├── model/                 # LSTM model + manager
-├── explain/               # Lightweight explainability
-├── decision/              # Decision engine (user prompts)
-└── forensics/             # SQLite logging + replay
+├── test_monitor.py        # Smoke test for collection layer
+├── collection/            # Data collection: file + process event monitoring
+│   ├── event_monitor.py   # EventMonitor (watchdog + psutil)
+│   ├── event_types.py     # Event dataclass, EventType
+│   └── entropy.py         # Shannon entropy computation
+├── processing/            # Feature extraction, model, explainability, decision
+│   ├── feature_engine/    # Sliding window feature extraction
+│   ├── model/             # LSTM model + manager
+│   ├── explain/           # Lightweight explainability
+│   └── decision/          # Decision engine (user prompts)
+├── forensics/             # SQLite logging + replay
+└── scripts/               # Test activity generators
+    ├── generate_benign_activity.py
+    └── generate_ransomware_activity.py
 ```
 
-Run all commands from the `ransomescope/` directory (where `main.py` lives).
+Run all commands from the project directory where `main.py` lives.
+
+For your WSL setup, this repo is available at:
+
+```bash
+~/ransomscope
+```
+
+If you sync from Windows into WSL, use:
+
+```bash
+rsync -av --delete \
+  --exclude='/venv/' \
+  --exclude='/.venv/' \
+  --exclude='**/__pycache__/' \
+  --exclude='*.pyc' \
+  --exclude='.pytest_cache/' \
+  --exclude='.mypy_cache/' \
+  /mnt/c/Work/Cursor/ransomescope/ ~/ransomscope/
+```
 
 ---
 
 ### 2. Installation (Fedora / Linux)
 
 ```bash
-cd ransomescope
+cd ~/ransomscope
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
@@ -147,7 +174,28 @@ You should see logs like:
 - When inference runs: `RISK=0.xx | LEVEL=BENIGN|SUSPICIOUS|HIGH | RANSOM_SIGNALS=[...] | BENIGN_SIGNALS=[...]`
 - For suspicious/high risk: a detailed feature breakdown
 
-Use `--verbose` to log every event. Latency per inference should stay under 1000 ms.
+Use `--verbose` for compact activity snapshots (counts, entropy delta, latest risk/level).
+Latency per inference should stay under 1000 ms.
+
+For a guaranteed demo prompt path (high-risk flow):
+
+```bash
+python main.py run --watch /tmp/ransomescope_test \
+  --incident demo-1 \
+  --verbose \
+  --demo-force-high-risk
+```
+
+Optional threshold tuning (must keep suspicious > benign):
+
+```bash
+python main.py run --watch /tmp/ransomescope_test \
+  --incident demo-1 \
+  --verbose \
+  --benign-threshold 0.01 \
+  --suspicious-threshold 0.02 \
+  --demo-force-high-risk
+```
 
 #### 6.2 Trigger benign behaviour
 
@@ -200,6 +248,8 @@ Expected:
   - `Quarantine?` (no-op placeholder)
   - `Mark as safe?`
 
+If `k` targets the same PID as the running monitor, RansomScope now refuses self-termination and keeps monitoring alive.
+
 **Nothing is auto-deleted**, and quarantine is intentionally a no-op in this academic project.
 
 Press `Ctrl+C` in the main window to stop RansomScope when done.
@@ -234,40 +284,18 @@ This gives you a forensic view of what RansomScope observed and how it reacted.
 
 ### 8. Module overview
 
-- **`monitor/`**  
+- **`collection/`** – Data collection  
   - Uses `watchdog` (inotify) for file system events.  
   - Uses `psutil` to capture new processes and parent/child relationships.  
   - Computes Shannon entropy and entropy deltas for modified files.  
   - Skips system directories (`/usr`, `/lib`, `/bin`, …).  
   - Emits structured `Event` objects.
 
-- **`feature_engine/`**  
-  - Maintains 5-second windows with 2-second overlap.  
-  - Keeps the last 10 windows as a sequence.  
-  - Features per window:
-    - `file_mod_count`, `rename_count`, `delete_count`  
-    - `entropy_avg_delta`  
-    - `child_process_count`  
-    - `privilege_flag`  
-    - `user_dir_activity_ratio`
-
-- **`model/`**  
-  - PyTorch `RansomScopeLSTM` with:
-    - LSTM (`hidden_size=64`)  
-    - Fully-connected output + sigmoid for risk score  
-  - `ModelManager` for load/save and inference.
-
-- **`explain/`**  
-  - Simple thresholds over recent window features.  
-  - Produces human-readable summaries:
-    - e.g. “High rate of file modifications; strong increase in file entropy”.
-
-- **`decision/`**  
-  - Maps risk scores to:
-    - `benign` → no action  
-    - `suspicious` → log only  
-    - `high` → prompt user to kill / quarantine / mark safe  
-  - Uses `psutil` to terminate a process if you choose `kill`.
+- **`processing/`** – Feature extraction, model, explainability, decision  
+  - **feature_engine/** – 5-second windows with 2-second overlap; features: `file_mod_count`, `rename_count`, `delete_count`, `entropy_avg_delta`, `child_process_count`, `privilege_flag`, `user_dir_activity_ratio`.  
+  - **model/** – PyTorch LSTM; `ModelManager` for load/save and inference.  
+  - **explain/** – Human-readable summaries from window features.  
+  - **decision/** – Maps risk to actions: benign → none; suspicious → log; high → prompt (kill/quarantine/safe).
 
 - **`forensics/`**  
   - SQLite timeline with columns:
@@ -276,23 +304,22 @@ This gives you a forensic view of what RansomScope observed and how it reacted.
 
 ---
 
-### 9. How to validate end-to-end
+### 9. How to see if it works (verification steps)
 
-1. **Unit-ish checks**
-   - `python test_monitor.py` to ensure events + entropy work.
-   - `python dataset_gen.py` and inspect the CSV.
-2. **Model training**
-   - `python train.py --data ransomescope_dataset.csv`.
-   - Confirm `ransomescope_lstm.pt` is created.
-3. **Real-time run**
-   - `python main.py run --watch /tmp/ransomescope_test --incident demo-incident-1`.
-   - Generate benign + encrypted-like activity in `/tmp/ransomescope_test`.
-   - Observe changing `risk_score` and explanations.
-4. **Forensic replay**
-   - `python main.py replay demo-incident-1`.
-   - Inspect the reconstructed timeline.
+Use these checks to confirm RansomScope is working:
 
-If all of the above behave as expected, RansomScope is working end-to-end for this academic setup.
+| Step | Command | Expected result |
+|------|---------|-----------------|
+| **1. Collection layer** | `python test_monitor.py` | Prints events with `event_type`, `file_path`, `entropy`, `process_id`. No errors. |
+| **2. Dataset generation** | `python dataset_gen.py --output ransomescope_dataset.csv --benign-runs 5 --ransom-runs 5` | Creates CSV. `head ransomescope_dataset.csv` shows rows with label + numeric features. |
+| **3. Model training** | `python train.py --data ransomescope_dataset.csv --epochs 5` | Epoch logs with train_loss, val_loss, val_acc. File `ransomescope_lstm.pt` is created. |
+| **4. Real-time run** | `python main.py run --watch /tmp/ransomescope_test --incident demo-1` | Logs "Watching: ...", "Windows: N/10", then RISK/LEVEL lines once 10 windows fill. |
+| **4b. Demo high-risk run** | `python main.py run --watch /tmp/ransomescope_test --incident demo-1 --verbose --demo-force-high-risk` | Prints compact activity snapshots and reliably reaches high-risk prompt when ransomware signals appear. |
+| **5. Trigger benign activity** | In another terminal: `mkdir -p /tmp/ransomescope_test; for i in {1..20}; do echo "hello $i" > /tmp/ransomescope_test/f_$i.txt; done` | RISK values mostly low; BENIGN_SIGNALS in explanations. |
+| **6. Trigger ransomware-like** | `python scripts/generate_ransomware_activity.py /tmp/ransomescope_test` | RISK values rise; RANSOM_SIGNALS appear; possible high-risk alert. |
+| **7. Forensic replay** | `python main.py replay demo-1` | Prints chronological timeline with timestamps, event types, risk scores, decisions. |
+
+**Summary:** Steps 1–3 validate installation and training. Steps 4–7 validate the real-time pipeline. If step 1 fails (e.g. on Windows without inotify), use WSL or a Linux VM. If steps 2–3 succeed, the processing pipeline is intact.
 
 ---
 
@@ -300,8 +327,9 @@ If all of the above behave as expected, RansomScope is working end-to-end for th
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| Nothing shows in Terminal 1 | You should now see each event as `event #N file_create file=/path`. Risk scores appear only after 10 windows (~35s of activity). | Run the benign script, then keep RansomScope running longer or run the script multiple times. |
+| Only activity lines, no risk line yet | Sequence not ready yet (needs 10 windows) unless demo mode is enabled. | Keep monitoring longer, generate more activity, or run with `--demo-force-high-risk`. |
 | Replay: "No events found" | Wrong `incident_id`. Replay must match `--incident` exactly. | Use the same ID: `python main.py replay benign-test` if you ran with `--incident benign-test`. |
 | No file events at all | WSL/inotify sometimes misses events on `/tmp`. | Try watching your home dir: `--watch ~/ransomescope_test`, then run the benign script there. |
 | Process suspended | You pressed `Ctrl+Z` instead of `Ctrl+C`. | Use `fg` to resume, then `Ctrl+C` to stop. Prefer `Ctrl+C` to stop cleanly. |
+| `unrecognized arguments: --demo-force-high-risk` | You are running an older WSL copy of `main.py`. | Re-sync from `/mnt/c/Work/Cursor/ransomescope/` to `~/ransomscope/`, then run `python main.py run -h` to confirm flags. |
 

@@ -1,4 +1,4 @@
-"""Monitoring layer - file and process event collection."""
+"""Data collection: file system and process event monitoring."""
 
 from .event_monitor import EventMonitor
 from .event_types import Event, EventType

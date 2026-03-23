@@ -23,8 +23,8 @@ from watchdog.events import (
 from watchdog.observers import Observer
 
 import config
-from monitor.entropy import compute_shannon_entropy
-from monitor.event_types import Event, EventType
+from collection.entropy import compute_shannon_entropy
+from collection.event_types import Event, EventType
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +56,19 @@ def _check_privilege_escalation(proc: psutil.Process) -> bool:
     except (psutil.NoSuchProcess, psutil.AccessDenied):
         pass
     return False
+
+
+def _seed_entropy_history(entropy_cache: dict[str, deque[float]], file_path: str) -> Optional[float]:
+    """Compute and cache baseline entropy for a file path.
+
+    This allows the next FILE_MODIFY event to produce a meaningful entropy delta.
+    """
+    entropy = compute_shannon_entropy(file_path)
+    if entropy is None:
+        return None
+    history = entropy_cache.setdefault(file_path, deque(maxlen=ENTROPY_HISTORY_SIZE))
+    history.append(entropy)
+    return entropy
 
 
 class EventMonitor:
@@ -132,6 +145,8 @@ class EventMonitor:
 
         if event_type == EventType.FILE_MODIFY and not _is_excluded_path(src_path):
             entropy, entropy_delta = self._compute_entropy_and_delta(src_path)
+        elif event_type in {EventType.FILE_CREATE, EventType.FILE_RENAME} and not _is_excluded_path(src_path):
+            entropy = _seed_entropy_history(self._entropy_cache, src_path)
 
         if pid is None or ppid is None:
             try:
