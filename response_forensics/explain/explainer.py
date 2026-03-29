@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 import config
-from processing.feature_engine import WindowFeatures
+from detection_analysis.feature_engine import WindowFeatures
 
 logger = logging.getLogger(__name__)
 

@@ -3,7 +3,7 @@
 
 WARNING: Use ONLY in a throwaway test directory. This modifies and renames files.
 Run in a separate terminal while RansomScope is watching the target directory.
-Example: python scripts/generate_ransomware_activity.py /tmp/ransomescope_test
+Example: python response_forensics/scripts/generate_ransomware_activity.py /tmp/ransomescope_test
 """
 
 from __future__ import annotations

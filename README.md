@@ -21,17 +21,18 @@ ransomescope/
 ├── train.py               # LSTM training script
 ├── dataset_gen.py         # Synthetic dataset generator
 ├── test_monitor.py        # Smoke test for collection layer
-├── collection/            # Data collection: file + process event monitoring
-│   ├── event_monitor.py   # EventMonitor (watchdog + psutil)
-│   ├── event_types.py     # Event dataclass, EventType
-│   └── entropy.py         # Shannon entropy computation
-├── processing/            # Feature extraction, model, explainability, decision
+├── data_collection/
+│   ├── collection/        # Event monitoring + event types + entropy
+│   ├── monitor/           # Monitoring domain package
+│   └── processing/        # Shared processing/domain orchestration package
+├── detection_analysis/
 │   ├── feature_engine/    # Sliding window feature extraction
 │   ├── model/             # LSTM model + manager
-│   ├── explain/           # Lightweight explainability
 │   └── decision/          # Decision engine (user prompts)
-├── forensics/             # SQLite logging + replay
-└── scripts/               # Test activity generators
+└── response_forensics/
+  ├── explain/           # Lightweight explainability
+  ├── forensics/         # SQLite logging + replay
+  └── scripts/           # Test activity generators
     ├── generate_benign_activity.py
     └── generate_ransomware_activity.py
 ```
@@ -216,7 +217,7 @@ Expected:
 **WARNING:** Use the ransomware script only in a throwaway test directory. It modifies and renames files.
 
 ```bash
-python scripts/generate_ransomware_activity.py /tmp/ransomescope_test
+python response_forensics/scripts/generate_ransomware_activity.py /tmp/ransomescope_test
 ```
 
 Or manually (careful):
@@ -297,7 +298,7 @@ This gives you a forensic view of what RansomScope observed and how it reacted.
   - **explain/** – Human-readable summaries from window features.  
   - **decision/** – Maps risk to actions: benign → none; suspicious → log; high → prompt (kill/quarantine/safe).
 
-- **`forensics/`**  
+- **`response_forensics/forensics/`**  
   - SQLite timeline with columns:
     - `timestamp`, `event_type`, `process_id`, `file_path`, `entropy`, `risk_score`, `decision`, `incident_id`  
   - `replay_incident()` dumps a chronological narrative for an incident.
@@ -316,7 +317,7 @@ Use these checks to confirm RansomScope is working:
 | **4. Real-time run** | `python main.py run --watch /tmp/ransomescope_test --incident demo-1` | Logs "Watching: ...", "Windows: N/10", then RISK/LEVEL lines once 10 windows fill. |
 | **4b. Demo high-risk run** | `python main.py run --watch /tmp/ransomescope_test --incident demo-1 --verbose --demo-force-high-risk` | Prints compact activity snapshots and reliably reaches high-risk prompt when ransomware signals appear. |
 | **5. Trigger benign activity** | In another terminal: `mkdir -p /tmp/ransomescope_test; for i in {1..20}; do echo "hello $i" > /tmp/ransomescope_test/f_$i.txt; done` | RISK values mostly low; BENIGN_SIGNALS in explanations. |
-| **6. Trigger ransomware-like** | `python scripts/generate_ransomware_activity.py /tmp/ransomescope_test` | RISK values rise; RANSOM_SIGNALS appear; possible high-risk alert. |
+| **6. Trigger ransomware-like** | `python response_forensics/scripts/generate_ransomware_activity.py /tmp/ransomescope_test` | RISK values rise; RANSOM_SIGNALS appear; possible high-risk alert. |
 | **7. Forensic replay** | `python main.py replay demo-1` | Prints chronological timeline with timestamps, event types, risk scores, decisions. |
 
 **Summary:** Steps 1–3 validate installation and training. Steps 4–7 validate the real-time pipeline. If step 1 fails (e.g. on Windows without inotify), use WSL or a Linux VM. If steps 2–3 succeed, the processing pipeline is intact.

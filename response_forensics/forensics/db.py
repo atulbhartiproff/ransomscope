@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 import config
-from collection.event_types import Event
+from data_collection.collection.event_types import Event
 
 logger = logging.getLogger(__name__)
 

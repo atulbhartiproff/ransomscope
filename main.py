@@ -47,12 +47,12 @@ def _print_ransomware_alert(watch_dir: str, location: str, risk_score: float) ->
 
 
 import config
-from collection import EventMonitor
-from forensics import ForensicsLogger, replay_incident
-from processing.decision import DecisionEngine
-from processing.explain import ExplainabilityEngine
-from processing.feature_engine import SlidingWindowEngine
-from processing.model import ModelManager
+from data_collection.collection import EventMonitor
+from response_forensics.forensics import ForensicsLogger, replay_incident
+from detection_analysis.decision import DecisionEngine
+from response_forensics.explain import ExplainabilityEngine
+from detection_analysis.feature_engine import SlidingWindowEngine
+from detection_analysis.model import ModelManager
 
 
 def run_monitor(args: argparse.Namespace) -> None:

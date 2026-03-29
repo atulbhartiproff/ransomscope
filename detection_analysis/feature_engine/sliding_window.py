@@ -15,7 +15,7 @@ from typing import Deque, List, Optional
 from collections import deque
 
 import config
-from collection.event_types import Event, EventType
+from data_collection.collection.event_types import Event, EventType
 
 logger = logging.getLogger(__name__)
 

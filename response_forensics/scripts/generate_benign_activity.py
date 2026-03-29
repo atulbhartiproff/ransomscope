@@ -2,7 +2,7 @@
 """Generate benign filesystem activity for RansomScope testing.
 
 Run this in a separate terminal while RansomScope is watching the target directory.
-Example: python scripts/generate_benign_activity.py /tmp/ransomescope_test
+Example: python response_forensics/scripts/generate_benign_activity.py /tmp/ransomescope_test
 """
 
 from __future__ import annotations

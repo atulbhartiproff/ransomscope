@@ -17,7 +17,7 @@ from torch import nn
 from torch.utils.data import DataLoader, Dataset, random_split
 
 import config
-from processing.model import RansomScopeLSTM, build_loss_and_optimizer, ModelManager
+from detection_analysis.model import RansomScopeLSTM, build_loss_and_optimizer, ModelManager
 
 logger = logging.getLogger(__name__)
 

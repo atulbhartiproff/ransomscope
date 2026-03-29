@@ -23,8 +23,8 @@ from watchdog.events import (
 from watchdog.observers import Observer
 
 import config
-from collection.entropy import compute_shannon_entropy
-from collection.event_types import Event, EventType
+from data_collection.collection.entropy import compute_shannon_entropy
+from data_collection.collection.event_types import Event, EventType
 
 logger = logging.getLogger(__name__)
 

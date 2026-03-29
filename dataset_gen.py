@@ -14,8 +14,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, List
 
-from collection.event_types import Event, EventType
-from processing.feature_engine import SlidingWindowEngine
+from data_collection.collection.event_types import Event, EventType
+from detection_analysis.feature_engine import SlidingWindowEngine
 
 logger = logging.getLogger(__name__)
 
